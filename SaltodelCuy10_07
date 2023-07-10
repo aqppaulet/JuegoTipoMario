@@ -1,0 +1,208 @@
+#include <SFML/Graphics.hpp>
+#include <iostream>
+
+class PersonajeModelo
+{
+protected:
+    float posicionX;
+    float posicionY;
+    bool enElAire;
+    float desplazamientoY;
+
+public:
+    PersonajeModelo(float posX, float posY)
+        : posicionX(posX), posicionY(posY), enElAire(false), desplazamientoY(0.0f)
+    {
+    }
+
+    float getPosicionX() const { return posicionX; }
+    float getPosicionY() const { return posicionY; }
+    bool estaEnElAire() const { return enElAire; }
+
+    virtual void mover(float desplazamientoX, float deltaTime)
+    {
+        float nuevaPosX = posicionX + desplazamientoX * deltaTime;
+        posicionX = nuevaPosX;
+    }
+
+    void saltar(float velocidadSalto)
+    {
+        if (!enElAire)
+        {
+            desplazamientoY = velocidadSalto;
+           // posicionY += desplazamientoY * 0.016f;
+            enElAire = true;
+        }
+    }
+
+    void aplicarGravedad(float gravedad, float deltaTime)
+    {
+        desplazamientoY += gravedad * deltaTime;
+        posicionY += desplazamientoY  * deltaTime;
+    }
+
+    void setEnElAire(bool value) { enElAire = value; }
+};
+
+// Clase derivada: JugadorModelo
+class JugadorModelo : public PersonajeModelo
+{
+public:
+    JugadorModelo(float posX, float posY)
+        : PersonajeModelo(posX, posY)
+    {
+    }
+
+    void mover(float desplazamientoX, float deltaTime) override
+    {
+        // Lógica de movimiento específica del jugador, si es necesario
+        PersonajeModelo::mover(desplazamientoX, deltaTime);
+    }
+};
+
+
+
+
+
+
+
+// Vista
+class JugadorVista
+{
+public:
+    sf::RenderWindow ventana;  // Ventana principal de la vista
+    sf::RectangleShape plataforma;
+private:
+    sf::Sprite jugadorSprite;
+    sf::Texture texturaJugador;
+    sf::RectangleShape fondo;
+
+    sf::Texture texturaFondo;  // Nueva textura para el fondo
+    sf::Sprite fondoSprite;    // Nuevo sprite para el fondo
+
+
+
+public:
+    JugadorVista(JugadorModelo& modelo)
+        : jugadorSprite(), texturaJugador(), texturaFondo(), fondoSprite(), plataforma()
+    {
+        ventana.create(sf::VideoMode(800, 600), "Super Cuy Bros");  // Crear la ventana principal
+        ventana.setFramerateLimit(60);  // Limitar el número de cuadros por segundo
+
+        if (!texturaJugador.loadFromFile("personaje.jpg"))
+        {
+            std::cout << "Error al cargar la textura del jugador." << std::endl;
+        }
+
+        jugadorSprite.setTexture(texturaJugador);
+        jugadorSprite.setScale(0.5f, 0.5f);
+
+        fondo.setSize(sf::Vector2f(800.0f, 600.0f));
+        fondo.setFillColor(sf::Color::Blue);
+
+        plataforma.setSize(sf::Vector2f(800.0f, 200.0f));
+        plataforma.setFillColor(sf::Color::Green);
+        plataforma.setPosition(0.0f, 470.0f);
+
+    }
+
+    void actualizar(float jugadorX, float jugadorY)
+    {
+        jugadorSprite.setPosition(jugadorX, jugadorY);
+    }
+
+    void dibujar()
+    {
+        ventana.clear();
+        ventana.draw(fondo);
+        ventana.draw(plataforma);
+        ventana.draw(jugadorSprite);
+        ventana.display();
+    }
+
+
+};
+
+
+// Controlador
+class JuegoControlador
+{
+public:
+    JuegoControlador(JugadorModelo& modelo, JugadorVista& vista)
+        : modelo(modelo), vista(vista)
+    {
+    }
+
+    void ejecutar()
+    {
+        while (vista.ventana.isOpen())
+        {
+            procesarEventos();
+            actualizar();
+            vista.dibujar();
+
+        }
+    }
+
+private:
+    JugadorModelo& modelo;
+    JugadorVista& vista;
+
+    void procesarEventos()
+    {
+        sf::Event evento;
+        while (vista.ventana.pollEvent(evento))
+        {
+            if (evento.type == sf::Event::Closed)
+                vista.ventana.close();
+            if (evento.type == sf::Event::KeyPressed)
+            {
+                if (evento.key.code == sf::Keyboard::Space)
+                {
+                    modelo.saltar(-500.0f);
+                }
+            }
+        }
+    }
+
+    void actualizar()
+    {
+        float deltaTime = 0.016f; // Se puede obtener el deltaTime real si se desea
+
+        float desplazamientoX = 0.0f;
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+        {
+            desplazamientoX -= 200.0f;
+        }
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+        {
+            desplazamientoX += 200.0f;
+        }
+
+        modelo.mover(desplazamientoX, deltaTime);
+        vista.actualizar(modelo.getPosicionX(), modelo.getPosicionY());
+
+        if (modelo.estaEnElAire())
+        {
+            modelo.aplicarGravedad(500.0f, deltaTime);
+
+            if (modelo.getPosicionY() + 90.0f >= vista.plataforma.getPosition().y)
+            {
+                modelo.setEnElAire(false);
+                //modelo.aplicarGravedad(0.0f, deltaTime);
+                modelo.mover(0.0f, deltaTime);
+            }
+        }
+    }
+};
+
+int main()
+{
+    JugadorModelo modelo(0.0f, 380.0f);
+    JugadorVista vista(modelo);
+    JuegoControlador controlador(modelo, vista);
+
+    controlador.ejecutar();
+
+    return 0;
